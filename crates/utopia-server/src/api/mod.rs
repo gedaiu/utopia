@@ -662,4 +662,7 @@ mod system_admin_tests;
 mod oidc_exchange_tests;
 
 #[cfg(test)]
+mod token_setup_tests;
+
+#[cfg(test)]
 mod rule_expression_tests;
