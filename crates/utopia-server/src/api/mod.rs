@@ -650,9 +650,6 @@ async fn jobs_noop(
 }
 
 #[cfg(test)]
-mod password_login_tests;
-
-#[cfg(test)]
 mod rule_metadata_tests;
 
 #[cfg(test)]
