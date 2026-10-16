@@ -125,6 +125,8 @@ push documents in.
 - 2026-10-16: decision 6 let a token create only `statements` sources, though an `api` source is
   push-only as well; a backend mirroring several kinds of documents pushes them through one. A
   token now creates `api` sources too.
+- 2026-10-16: document content (0052) gained a read of a pushed document by its `external_id`
+  (#1276); it takes `SessionOrToken` like the other content reads, so decision 6 names it.
 
 ## Open questions
 
