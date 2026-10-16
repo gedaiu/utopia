@@ -665,4 +665,7 @@ mod token_setup_tests;
 mod token_read_tests;
 
 #[cfg(test)]
+mod token_graph_view_tests;
+
+#[cfg(test)]
 mod rule_expression_tests;
