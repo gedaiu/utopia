@@ -1,6 +1,6 @@
 # 0014 · Identity from the person, scope from the token
 
-- **Status**: Implemented · 2026-10-16 · #180, #318, #1243 · open: tokens across workspaces
+- **Status**: Implemented · 2026-10-16 · #180, #318, #1243, #1262 · open: tokens across workspaces
 - **Written**: 2026-09-01 · condensed into English 2026-09-03
 - **Related**: migration `0014_data_source_grants` gave data sources a grant layer; this is the same question where a machine knocks. [0004](0004-language-and-localization.md) has the server speak English only, MCP error codes included. [0015](0015-recording-a-sentence-is-not-asserting-a-fact.md) removes the main objection to opening `remember` over MCP.
 
@@ -79,22 +79,34 @@ push documents in.
    `alignment.kind_word_decided`, `ontology.imported`) carry the acting token's id as
    `detail.token_id`, so before revoking a leaked token an admin can see what it did (decision
    5). One extractor, `SessionOrToken`, takes either credential, and only these routes,
-   document content (0052) and chunk search (revision 2026-10-16) use it; `AuthUser` still reads every bearer as a JWT, so the routes
-   behind it stay session-only until someone has a reason to open one and says it here.
+   document content (0052, including the read by a pushed document's `external_id`), chunk
+   search and the graph reads of decision 7 use it; `AuthUser` still reads every bearer as a
+   JWT, so the routes behind it stay session-only until someone has a reason to open one and
+   says it here.
 
    Not done: rotating or deleting a source, changing a base's settings or members, and every
    other write still take a session. A token does not create workspaces or tokens.
 
 7. **A token reads the graph** (added 2026-10-16, #1262). A service that mirrors into a base reads the
    base back to check what landed, and a session JWT is the wrong credential for a backend
-   (decision 6). Four reads now also take any live token, acting as its owner: searching a base's
-   entities (`GET /kbs/{id}/entities`), an entity's detail (`GET /kbs/{id}/entities/{eid}`), its
-   record-axis history (`…/history`), and a fact's evidence (`GET /kbs/{id}/facts/{fid}/evidence`).
-   Search finds the entity by name; the detail gives its facts, names and derivations; the
-   history says when we changed our mind; the evidence ties a fact to its sentence. Read is the
-   lowest scope, so any token qualifies; the owner's role is still the ceiling and Viewer
-   suffices; a token whose `kb_ids` exclude the base gets 404, as for document content (0052).
-   Changing an entity on the same path (`PATCH`) still takes a session.
+   (decision 6). These reads take any live token, acting as its owner:
+   - entity search (`GET /kbs/{id}/entities`), to find an entity by name;
+   - an entity's detail (`GET /kbs/{id}/entities/{eid}`), its facts, names and derivations;
+   - its record-axis history (`…/history`), when we changed our mind;
+   - a fact's evidence (`GET /kbs/{id}/facts/{fid}/evidence`), the sentence behind it;
+   - the graph overview and an entity's neighbourhood (`GET /kbs/{id}/graph/overview`,
+     `…/graph/neighborhood`), the shape of what was pushed and what a statement touches;
+   - the ontology and a class's instances (`GET /kbs/{id}/ontology`,
+     `…/ontology/entity-types/{type_id}/entities`), to turn a class key into its members;
+   - a document's extractions (`GET /documents/{id}/extractions`), what was read from it;
+   - the export (`GET /kbs/{id}/export`). A read token may take the whole base out because a
+     Viewer could already copy it piece by piece through the reads above; requiring write scope
+     would only push a mirror to hold a write token for a read-only job. The `kb.exported` row
+     names the token, and that is the control.
+
+   Read is the lowest scope, so any token qualifies; the owner's role is still the ceiling and
+   Viewer suffices; a token whose `kb_ids` exclude the base gets 404, as for document content
+   (0052). Writes on the same paths (`PATCH` on an entity, ontology edits) still take a session.
 
 ## Dead ends
 
@@ -117,16 +129,12 @@ push documents in.
 - 2026-10-15: the status line still said `can_write` was hard-coded false. #318 had already
   computed it from the token's scope and the person's role, and `remember` has been reachable
   over MCP with a write token since then. The line now names what is open.
-- 2026-10-16: decision 7 opens four graph reads to any token; decision 6's "only these routes
-  and document content" now also counts them.
-
-- 2026-10-16: decision 7 opens a document's extractions and a base's export to any token; the
-  sentence in decision 6 that only its routes and document content take a token predates it.
+- 2026-10-16: decision 7 opens the graph reads to any token; decision 6's list of the routes
+  that take one now counts them, chunk search, and the read of a pushed document by its
+  `external_id` (#1276).
 - 2026-10-16: decision 6 let a token create only `statements` sources, though an `api` source is
   push-only as well; a backend mirroring several kinds of documents pushes them through one. A
   token now creates `api` sources too.
-- 2026-10-16: document content (0052) gained a read of a pushed document by its `external_id`
-  (#1276); it takes `SessionOrToken` like the other content reads, so decision 6 names it.
 
 ## Open questions
 
