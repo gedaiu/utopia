@@ -674,4 +674,7 @@ mod token_ontology_tests;
 mod token_export_tests;
 
 #[cfg(test)]
+mod search_routes_tests;
+
+#[cfg(test)]
 mod rule_expression_tests;
