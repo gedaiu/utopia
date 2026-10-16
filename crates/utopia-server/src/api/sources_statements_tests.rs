@@ -740,10 +740,6 @@ async fn a_new_id_with_a_tombstoned_ids_content_takes_over_its_document() -> any
 /// 回收站里的 ID 推来另一篇文档的内容：先答重复，回收站里那篇不被恢复
 #[tokio::test]
 async fn a_trashed_id_pushed_with_another_documents_content_stays_in_the_trash(
-/// 推上去的身份按 external_id 读得回来（#1276）：读令牌拿到当前正文与两个版本；
-/// 限定到别的库的令牌和读不到的文档一样是 404
-#[tokio::test]
-async fn a_read_token_reads_an_updated_identity_back_and_one_for_another_base_gets_404(
 ) -> anyhow::Result<()> {
     let Some(f) = Fixture::new().await? else {
         return Ok(());
@@ -766,6 +762,17 @@ async fn a_read_token_reads_an_updated_identity_back_and_one_for_another_base_ge
         .await?
         .expect("a is still stored");
     assert!(a.deleted_at.is_some(), "a stays in the trash");
+    f.cleanup().await
+}
+
+/// 推上去的身份按 external_id 读得回来（#1276）：读令牌拿到当前正文与两个版本；
+/// 限定到别的库的令牌和读不到的文档一样是 404
+#[tokio::test]
+async fn a_read_token_reads_an_updated_identity_back_and_one_for_another_base_gets_404(
+) -> anyhow::Result<()> {
+    let Some(f) = Fixture::new().await? else {
+        return Ok(());
+    };
     for place in ["kitchen table", "counter"] {
         let (status, body) = f
             .push(f.source, &f.token, &observation("08:14:03", place))
