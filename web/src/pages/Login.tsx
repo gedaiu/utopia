@@ -27,6 +27,7 @@ import {
 import { LoginScene } from "./LoginScene";
 import { loginSections, ssoErrorKey } from "./loginSections";
 import { usePageTitle } from "../useTitle";
+import { claimFor } from "../authSession";
 
 export function Login() {
   usePageTitle(S.app.name, S.login.signIn);
@@ -47,10 +48,12 @@ export function Login() {
       if (mode === "login") return api.login(email, password);
       return api.register(email, password, displayName);
     },
-    onSuccess: () => {
+    onSuccess: ({ user }) => {
       // 换人先清缓存：`me`、`workspaces` 这些一次会话内不过期（queryDefaults.ts），
       // 会话过期后同一标签页登另一个账号，不清就看见上一个人的名字和库
       queryClient.clear();
+      // 缓存外的草稿、上次会话和回答只在换了人时清：同一个人重新登录，它们还在（authSession.ts）
+      claimFor(user.id);
       // 谢幕：卡片上浮淡出、巨构放大穿越，再进入图谱首页
       setLeaving(true);
       window.setTimeout(() => navigate({ to: "/" }), 650);

@@ -26,16 +26,16 @@ import {
   Td,
   Th,
   Tr,
+  localDate,
 } from "../ui";
-
-const ymd = (iso: string) => iso.slice(0, 10);
+import { fetchMe } from "../authSession";
 
 function joinInfo(row: MyKb): string {
   if (row.my_role === "owner") return S.account.deploymentAdmin;
   if (row.joined_at) {
     return row.added_by_name
-      ? S.account.addedBy(row.added_by_name, ymd(row.joined_at))
-      : S.account.joinedOn(ymd(row.joined_at));
+      ? S.account.addedBy(row.added_by_name, localDate(row.joined_at))
+      : S.account.joinedOn(localDate(row.joined_at));
   }
   return S.account.openToEveryone;
 }
@@ -54,7 +54,7 @@ export function MyKbs() {
     queryFn: () => api.myKbs(workspace!.id),
     enabled: !!workspace,
   });
-  const me = useQuery({ queryKey: ["me"], queryFn: api.me });
+  const me = useQuery({ queryKey: ["me"], queryFn: fetchMe });
   /* 能不能建库：系统管理员，或者在这个工作区里是 Admin+（api/kbs.rs 的 create
      就是这么判的）。**editor 不能**——它管的是库里的内容，不是有几个库 */
   const wsRole = useQuery({
