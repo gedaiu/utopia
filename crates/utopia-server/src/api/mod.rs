@@ -668,4 +668,7 @@ mod token_read_tests;
 mod token_graph_view_tests;
 
 #[cfg(test)]
+mod token_ontology_tests;
+
+#[cfg(test)]
 mod rule_expression_tests;
