@@ -671,4 +671,7 @@ mod token_graph_view_tests;
 mod token_ontology_tests;
 
 #[cfg(test)]
+mod token_export_tests;
+
+#[cfg(test)]
 mod rule_expression_tests;

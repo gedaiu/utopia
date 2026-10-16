@@ -118,6 +118,9 @@ push documents in.
 - 2026-10-16: decision 7 opens four graph reads to any token; decision 6's "only these routes
   and document content" now also counts them.
 
+- 2026-10-16: decision 7 opens a document's extractions and a base's export to any token; the
+  sentence in decision 6 that only its routes and document content take a token predates it.
+
 ## Open questions
 
 - **`query_data` and `remember` over MCP.** The first version ships `search_chunks`,
