@@ -439,3 +439,30 @@ async fn an_ontology_binding_is_redecided_once_the_relation_stops_declaring_it(
     assert_eq!(materialize::count(&rig.pool, rig.kb).await?, 0);
     rig.cleanup().await
 }
+
+/// 推送完一篇，本体判过的签名就不再算「待判」（#1296）：后面每一篇推送都落在同几条签名上，
+/// 为它们数一遍全库的开放陈述是推送时数据库最贵的一笔。没有判定的那条照样待判
+#[tokio::test]
+async fn a_signature_the_ontology_already_bound_is_not_undecided() -> anyhow::Result<()> {
+    let Some(rig) = Rig::new().await? else {
+        return Ok(());
+    };
+    let props = utopia_store::ontology::relation_type_views(&rig.pool, rig.kb).await?;
+    let classes = utopia_store::graph::entity_types(&rig.pool, rig.kb).await?;
+    let closure = closures(classes.iter().map(|c| (c.id, c.parents.as_slice())));
+    let keys: HashSet<SignatureKey> = [rig.signature("validated_by").key()].into();
+    let before = undecided(keys.clone(), &HashMap::new(), &props, &closure);
+
+    rig.push("obs-1", ["S-1", "statement", "validated_by", "T-1", "test"])
+        .await?;
+    let existing: HashMap<_, _> = rig
+        .bindings()
+        .await?
+        .into_iter()
+        .map(|b| (b.key(), b))
+        .collect();
+    let after = undecided(keys.clone(), &existing, &props, &closure);
+
+    assert_eq!((before, after), (keys, HashSet::new()));
+    rig.cleanup().await
+}
