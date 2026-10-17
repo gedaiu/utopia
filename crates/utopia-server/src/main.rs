@@ -584,6 +584,15 @@ async fn dispatch(st: &state::AppState, job: &utopia_store::jobs::Job) -> anyhow
             let id = payload_document_id(&job.payload)?;
             time_resolution::resolve_document(st, id).await
         }
+        "embed_names" => {
+            let kb_id: Uuid = job
+                .payload
+                .get("kb_id")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse().ok())
+                .ok_or_else(|| anyhow::anyhow!("payload 缺少 kb_id"))?;
+            extraction_open::embed_names_job(st, kb_id).await
+        }
         "resolve_types" => {
             let kb_id: Uuid = job
                 .payload
