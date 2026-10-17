@@ -209,6 +209,41 @@ fn settled(
             && declared(sig, props, closure).map(|p| p.id) == b.relation_type_id)
 }
 
+/// 这些签名里还要本体判的：人判过的、本体按此刻声明的那条关系判过的（`settled`）都去掉。
+/// `settled` 只看签名的键（短语、两端的类、宾语是不是字面值），所以用不着先数全库的签名
+fn undecided(
+    keys: HashSet<SignatureKey>,
+    existing: &HashMap<SignatureKey, phrase_bindings::Binding>,
+    props: &[RelationTypeView],
+    closure: &Closure,
+) -> HashSet<SignatureKey> {
+    keys.into_iter()
+        .filter(|key| {
+            !existing
+                .get(key)
+                .is_some_and(|b| settled(b, &keyed(key), props, closure))
+        })
+        .collect()
+}
+
+/// 只有键的签名：计数与例句为空，够 `settled` / `declared` 判
+fn keyed(
+    (phrase, subject_type_id, object_type_id, object_is_value): &SignatureKey,
+) -> PhraseSignature {
+    PhraseSignature {
+        phrase: phrase.clone(),
+        subject_type_id: *subject_type_id,
+        subject_type_key: None,
+        object_type_id: *object_type_id,
+        object_type_key: None,
+        object_is_value: *object_is_value,
+        count: 0,
+        examples: Vec::new(),
+        quotes: Vec::new(),
+        example_statement_ids: Vec::new(),
+    }
+}
+
 /// 推送来的文档抽完（0054）：它的陈述落在的签名里，短语正好是一条声明了的关系的，由本体
 /// 直接绑上，记成本体判的（#1242）。不问模型，没配对话模型也照判；别的签名照旧留给对齐器。
 /// 判定照旧是签名上的一行（0044 决定 3），人看得见、改得了；人的判定不动（`decide_on`
@@ -237,6 +272,11 @@ pub(crate) async fn bind_declared(
         .into_iter()
         .map(|b| (b.key(), b))
         .collect();
+    // 第一篇之后，推送落在的签名本体都判过了：不数全库的签名也知道没有要判的（#1296）
+    let keys = undecided(keys, &existing, &props, &closure);
+    if keys.is_empty() {
+        return Ok(0);
+    }
     let mut written = 0;
     for s in phrase_bindings::signatures(pool, kb_id)
         .await?
