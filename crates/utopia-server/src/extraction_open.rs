@@ -861,7 +861,32 @@ async fn embed_names(
     out
 }
 
-/// 抽完一篇文档，把这个库里还没有向量的名字事实补上一批（这篇新写的名字都在里面）。
+/// `embed_names` 任务：把这个库里还没有向量的名字事实补上一批；一批满了说明可能还有，
+/// 再排一份接着补。没配嵌入模型就什么都不做——设置改了，下一篇文档会再排
+pub(crate) async fn embed_names_job(state: &AppState, kb_id: Uuid) -> anyhow::Result<()> {
+    let kb = utopia_store::kbs::get(&state.pool, kb_id).await?;
+    let Some(settings) = utopia_store::settings::get(&state.pool, kb.workspace_id).await? else {
+        return Ok(());
+    };
+    let Some(client) = crate::llm_util::embed_client(&settings) else {
+        return Ok(());
+    };
+    let filled = embed_pending_names(state, &settings, &client, kb_id).await?;
+    if filled > 0 {
+        tracing::info!(%kb_id, names = filled, "名字向量已补");
+    }
+    if i64::try_from(filled).unwrap_or(i64::MAX) >= NAME_VECTOR_PENDING {
+        utopia_store::jobs::enqueue_unless_queued(
+            &state.pool,
+            "embed_names",
+            serde_json::json!({ "kb_id": kb_id }),
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+/// 把这个库里还没有向量的名字事实补上一批（这一阵新写的名字都在里面）。
 /// 消解时算过的那些这里会再算一次——消解拿不到名字事实的 id（本名在 `create_entity`
 /// 的一条语句里落下）；省的只是一次嵌入调用，不值得为它改消解的返回值
 async fn embed_pending_names(
@@ -1186,14 +1211,16 @@ pub(crate) async fn run_open(
         state.emit_review(kb_id);
     }
 
-    // 名字向量：这篇新写的名字事实，向量补上（0041 决定 3 通道 2）。算不出来只记日志——
-    // 文档已经抽完了，不能因为召回的辅助数据没算而把它标成 failed
-    if let (Some(settings), Some(client)) = (settings, &embed) {
-        match embed_pending_names(state, settings, client, kb_id).await {
-            Ok(n) if n > 0 => tracing::info!(%document_id, names = n, "名字向量已补"),
-            Ok(_) => {}
-            Err(e) => tracing::warn!(%document_id, error = %e, "名字向量没补上，下一篇再补"),
-        }
+    // 名字向量：这篇新写的名字事实，向量补上（0041 决定 3 通道 2）。补在一份按库去重的
+    // `embed_names` 任务里（#1296）：找还没有向量的名字要扫全库的名字事实，一阵推送几百篇
+    // 时每篇扫一遍是推送最贵的几笔之一；排着一份就不再排，它跑一遍补上这一阵写下的名字
+    if settings.is_some() && embed.is_some() {
+        utopia_store::jobs::enqueue_unless_queued(
+            pool,
+            "embed_names",
+            serde_json::json!({ "kb_id": kb_id }),
+        )
+        .await?;
     }
 
     // 灰区对进了审核队列 → 治理 / 裁决任务，同库已排着的不重复。
@@ -1232,6 +1259,10 @@ mod known_flow_tests;
 #[cfg(test)]
 #[path = "extraction_open_out_of_credit_tests.rs"]
 mod out_of_credit_tests;
+
+#[cfg(test)]
+#[path = "extraction_open_name_vectors_job_tests.rs"]
+mod name_vectors_job_tests;
 
 #[cfg(test)]
 mod tests {
