@@ -190,9 +190,14 @@ async fn call_and_parse_one_chunk(
     }
     // 名字向量（0041 决定 3 通道 2）：这一块里有名字的东西，名字字符串各算一条，
     // 消解时拿它在同库的名字向量里找近邻。一块一批；算不出来（端点抖了）不拦抽取，
-    // 只是这一块少一条召回通道
+    // 只是这一块少一条召回通道。
+    //
+    // 推送的块不算（#1293、#1296）：推送来的名字是客户端给的身份，只按字面归并或新建。
+    // 机器起的名字共用前缀，向量上个个相近，排出的对永远不是一个，而每个名字一次全库
+    // 近邻查询是推送时数据库的主要开销。名字本身的向量照样由 `embed_pending_names`
+    // 补上，别的文档仍能在通道 2 里召回到它们
     let name_vecs: HashMap<String, Vec<f32>> = match (settings, embed_client) {
-        (Some(settings), Some(client)) => {
+        (Some(settings), Some(client)) if !pushed => {
             let mut wanted: Vec<(String, String)> = Vec::new();
             let mut seen: HashSet<String> = HashSet::new();
             for e in &extraction.entities {
@@ -1232,6 +1237,10 @@ mod known_flow_tests;
 #[cfg(test)]
 #[path = "extraction_open_out_of_credit_tests.rs"]
 mod out_of_credit_tests;
+
+#[cfg(test)]
+#[path = "extraction_open_pushed_names_tests.rs"]
+mod pushed_names_tests;
 
 #[cfg(test)]
 mod tests {

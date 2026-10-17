@@ -153,10 +153,11 @@ Content-Type: application/json
 
 Any other key is refused with `422`, so a mistaken `predicate` or `class` field cannot pass as a typed fact: the contract has no slot for one. A `subject`, or the entity of an `n` row, that is not listed in `e` is refused the same way, rather than dropped later in silence. A body over 64 KiB or with more than 200 statements is refused too.
 
-Two things to know before wiring a system to it:
+Three things to know before wiring a system to it:
 
 - **Send events, not state.** A row that *is* the current state of a system belongs on a mounted database, read at query time. Pushing it here copies state into the ledger and the two drift.
 - **A new push under the same identity does not close the old statement.** The earlier one becomes stale and goes to review; deciding that an interval ended is done on the typed layer, by alignment and the temporal engine, not by the push.
+- **A name you push is matched by its spelling.** It joins an entity with that name (case aside) or creates one; it is not compared by meaning with similar names, so two names for one thing stay two until an `n` row or a reviewer joins them.
 
 The response is the API push's: `{ "action": "created" }` · `updated` · `unchanged` · `marked_missing` · `duplicate` (with `duplicate_of`). It is never `moved`: the stored document carries its `external_id`, so two identities never share content.
 
