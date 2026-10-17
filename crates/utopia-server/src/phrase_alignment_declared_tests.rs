@@ -466,3 +466,27 @@ async fn a_signature_the_ontology_already_bound_is_not_undecided() -> anyhow::Re
     assert_eq!((before, after), (keys, HashSet::new()));
     rig.cleanup().await
 }
+
+/// 本体判不了的签名也不算「待判」（#1296）：短语叫得出关系、两端的类却不在它的域与值域里，
+/// `bind_declared` 什么也写不下，为它数一遍全库的签名是白数。判不判得了只看签名的键
+#[tokio::test]
+async fn a_signature_the_ontology_cannot_bind_is_not_undecided() -> anyhow::Result<()> {
+    let Some(rig) = Rig::new().await? else {
+        return Ok(());
+    };
+    let props = utopia_store::ontology::relation_type_views(&rig.pool, rig.kb).await?;
+    let classes = utopia_store::graph::entity_types(&rig.pool, rig.kb).await?;
+    let closure = closures(classes.iter().map(|c| (c.id, c.parents.as_slice())));
+    let outside = PhraseSignature {
+        subject_type_id: Some(rig.other),
+        subject_type_key: Some("other".into()),
+        ..rig.signature("validated_by")
+    };
+    let keys: HashSet<SignatureKey> = [outside.key()].into();
+
+    assert_eq!(
+        undecided(keys, &HashMap::new(), &props, &closure),
+        HashSet::new()
+    );
+    rig.cleanup().await
+}

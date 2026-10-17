@@ -209,8 +209,9 @@ fn settled(
             && declared(sig, props, closure).map(|p| p.id) == b.relation_type_id)
 }
 
-/// 这些签名里还要本体判的：人判过的、本体按此刻声明的那条关系判过的（`settled`）都去掉。
-/// `settled` 只看签名的键（短语、两端的类、宾语是不是字面值），所以用不着先数全库的签名
+/// 这些签名里还要本体判的：本体判得了（`declared`），又还没有人判过、也没按此刻声明的
+/// 那条关系判过（`settled`）。两样都只看签名的键（短语、两端的类、宾语是不是字面值），
+/// 所以用不着先数全库的签名
 fn undecided(
     keys: HashSet<SignatureKey>,
     existing: &HashMap<SignatureKey, phrase_bindings::Binding>,
@@ -219,9 +220,11 @@ fn undecided(
 ) -> HashSet<SignatureKey> {
     keys.into_iter()
         .filter(|key| {
-            !existing
-                .get(key)
-                .is_some_and(|b| settled(b, &keyed(key), props, closure))
+            let sig = keyed(key);
+            declared(&sig, props, closure).is_some()
+                && !existing
+                    .get(key)
+                    .is_some_and(|b| settled(b, &sig, props, closure))
         })
         .collect()
 }
@@ -272,7 +275,7 @@ pub(crate) async fn bind_declared(
         .into_iter()
         .map(|b| (b.key(), b))
         .collect();
-    // 第一篇之后，推送落在的签名本体都判过了：不数全库的签名也知道没有要判的（#1296）
+    // 推送落在的签名本体判不了、或第一篇之后已经判过：不数全库的签名也知道没有要判的（#1296）
     let keys = undecided(keys, &existing, &props, &closure);
     if keys.is_empty() {
         return Ok(0);
