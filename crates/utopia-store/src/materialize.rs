@@ -156,6 +156,14 @@ async fn materialize_in_tx(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     kb_id: Uuid,
 ) -> AppResult<(Outcome, Vec<Uuid>)> {
+    // Plan every statement of the recompute for this base. Prepared statements switch to a
+    // generic plan after a few runs, and a generic plan cannot see how many rows `kb_id = $1`
+    // selects: on a production base of 200,000 typed-fact sources the source cleanup below
+    // chose a nested loop over a materialized anti-join and ran for hours, where the plan for
+    // the base's own id takes two seconds. LOCAL ends with the transaction.
+    sqlx::query("SET LOCAL plan_cache_mode = force_custom_plan")
+        .execute(&mut **tx)
+        .await?;
     // 这一轮写下的行（新建的和并入的），提交后对账
     let mut written: Vec<Uuid> = Vec::new();
     // 0. 起止同值的物化状态行（#966 之前照抄一刻写下的）任何时刻都不成立：作废，它的陈述
@@ -698,3 +706,7 @@ pub async fn count(pool: &PgPool, kb_id: Uuid) -> AppResult<i64> {
 #[cfg(test)]
 #[path = "materialize_delivery_tests.rs"]
 mod delivery_tests;
+
+#[cfg(test)]
+#[path = "materialize_plan_tests.rs"]
+mod plan_tests;
